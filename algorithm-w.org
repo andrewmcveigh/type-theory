@@ -33,7 +33,7 @@ id | application | lambda | let
 (s/def ::var simple-symbol?)
 
 (s/def ::app
-  (s/cat :op ::exp :arg (s/* ::exp)))
+  (s/cat :op ::exp :args (s/* ::exp)))
 
 (s/def ::abs
   (s/cat :fn #{'fn} :arg (s/and vector? (s/cat :arg ::var)) :exp ::exp))
@@ -81,20 +81,23 @@ say /S/ is a unifier of /f(a, y)/ and /f(x, f(b, x))/.
   [x term]
   (let [[t form] term]
     (case t
-      ::app (if (not (contains? form :arg))
-              false
-              (let [name        (:op form)
-                    [arg1 & args] (:arg form)]
-                (if (= (first arg1) ::var)
-                  (if (= x (second arg1))
-                    true
-                    (occurs? x [::app {:op name :arg args}]))
-                  (or (occurs? x arg1)
-                      (if (seq args)
-                        (occurs? x [::app {:op name :arg args}])
-                        false)))))
+      ::app (when (contains? form :args)
+              (let [[[t' x' :as h] & args] (:args form)]
+                (or (and (= t' ::var) (= x x'))
+                    (occurs? x h)
+                    (and (seq args)
+                         (occurs? x [::app (assoc form :args args)])))))
       ::var (= x form)
-      false)))
+      nil)))
+
+(comment
+  (occurs? 'a (s/conform ::exp 'a))
+  (occurs? 'a (s/conform ::exp '(f a)))
+  (occurs? 'a (s/conform ::exp '((f b) a)))
+  (occurs? 'a (s/conform ::exp '((f b) b c d a)))
+  (occurs? 'a (s/conform ::exp '((f b) (g b) (h c (i a)))))
+
+  )
 
 #+END_SRC
 
