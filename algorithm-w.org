@@ -1,0 +1,104 @@
+* λ-calculus
+
+type constants
+type variables
+type operators
+type scheme (polytype?)
+
+fix : /∀α((α -> α) -> α)/
+
+
+Simply typed λ-calculus syntax
+/e ::= x | e e' | λx:τ.e | c/
+
+λ-calculus syntax
+/e ::= x | e e' | λx.e/
+
+HM language syntax
+id | application | lambda | let
+/e ::= x | e e' | λx.e | let x = e in e'/
+
+** Untyped λ-calculus syntax
+
+#+BEGIN_SRC clojure
+
+(require '[clojure.spec.alpha :as s])
+
+(s/def ::exp
+  (s/or ::var ::var
+        ::app ::app
+        ::abs ::abs
+        ::let ::let))
+
+(s/def ::var simple-symbol?)
+
+(s/def ::app
+  (s/cat :op ::exp :arg (s/* ::exp)))
+
+(s/def ::abs
+  (s/cat :fn #{'fn} :arg (s/and vector? (s/cat :arg ::var)) :exp ::exp))
+
+(s/def ::let
+  (s/cat :let #{'let}
+         :bin (s/and vector? (s/cat :var ::var :exp ::exp))
+         :exp ::exp))
+
+#+END_SRC
+
+Assuming a set of /type-variables α/ and primitive types /ι/, the syntax of
+types /τ/ and of /type-schemes σ/ is given by:
+
+τ ::= α | ι | τ -> τ
+σ ::= τ ∀ασ
+
+A type-scheme ∀α₁...αₙτ has /generic/ type variables α₁...αₙ. A /monotype μ/ is
+a type containing no type variables.
+
+* Algorithm W
+
+Unification is a recursive algorithm for determining a substitution of terms for
+variables (i.e. a variable assignment) that makes two terms equal. For example
+we can unify /f(a, y)/ with /f(x, f (b, x))/ with the substitution
+/[a/x, f (b, a)/y]/ which should be read ‘substitute /a/ for /x/ and then
+substitute /f(b, a)/ for /y/’.
+
+The substitution /S/ is the composition /S = [ f (b, x)/y] ◦ [a/x]/ of the two
+separate substitutions /[a/x]/ and /[f (b, x)/y]/. Note that composition of
+substitutions is right to left so that we perform the rightmost first, and we
+apply the rightmost to the leftmost in the process of composing. The order
+matters. It is easy to see that the substitution /S/ applied to /f(a, y)/ gives
+/f(a, f(b, a))/ and when applied to /f(x, f (b, x))/ yields the same. Thus we
+say /S/ is a unifier of /f(a, y)/ and /f(x, f(b, x))/.
+
+** Occurs check
+
+
+#+BEGIN_SRC clojure
+(defn occurs?
+  "A variable `x` occurs in `term` if and only if `t = f(s[1],...s[n])` for
+  `n > 0` and either `s[i] = x` or `x` occurs in `s[i]` for some
+  `i = 1,2,...,n`"
+  [x term]
+  (let [[t form] term]
+    (case t
+      ::app (if (not (contains? form :arg))
+              false
+              (let [name        (:op form)
+                    [arg1 & args] (:arg form)]
+                (if (= (first arg1) ::var)
+                  (if (= x (second arg1))
+                    true
+                    (occurs? x [::app {:op name :arg args}]))
+                  (or (occurs? x arg1)
+                      (if (seq args)
+                        (occurs? x [::app {:op name :arg args}])
+                        false)))))
+      ::var (= x form)
+      false)))
+
+#+END_SRC
+
+The Hindley-Milner Type Inference Algorithm
+Ian Grant∗
+January 17, 2011
+http://steshaw.org/hm/hindley-milner.pdf
