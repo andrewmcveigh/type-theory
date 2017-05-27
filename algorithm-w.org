@@ -119,13 +119,22 @@ say /S/ is a unifier of /f(a, y)/ and /f(x, f(b, x))/.
         ::var (let [[[t1 v1] & ss] l]
                 (if (= s v1) t1 (substitute ss term)))
         ::app (if-let [args (:args s)]
-                (letfn [(arglist [r xs]
-                          (if (empty? xs)
-                            (reverse r)
-                            (let [[h & t] xs]
-                              (arglist (cons (substitute l h) r) t))))]
-                  [::app (assoc s :args (arglist [] args))])
+                [::app (assoc s :args (map (partial substitute l) args))]
                 term)))))
+
+(comment
+
+  (substitute '{int? a} (s/conform ::exp 'a))
+
+  (substitute '{int? a} (s/conform ::exp '(f a)))
+
+  (substitute '{int? a} (s/conform ::exp '(f b)))
+
+  (substitute '{int? a} (s/conform ::exp '((f b) (g b) (h c (i a)))))
+
+  (substitute '{int? a} (s/conform ::exp '((f b) (g b) (h c (i d)))))
+
+  )
 
 #+END_SRC
 
