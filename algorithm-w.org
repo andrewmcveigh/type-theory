@@ -22,6 +22,8 @@ id | application | lambda | let
 
 #+BEGIN_SRC clojure
 
+(ns algorithm-w)
+
 (require '[clojure.spec.alpha :as s])
 
 (s/def ::exp
@@ -139,20 +141,6 @@ say /S/ is a unifier of /f(a, y)/ and /f(x, f(b, x))/.
 #+END_SRC
 
 #+BEGIN_SRC sml
-fun subs [] term = term
-  | subs ((t1,v1)::ss) (term as Tyvar name) =
-      if name=v1 then t1 else subs ss term
-  | subs _ (term as Tyapp(name,[])) = term
-  | subs l (Tyapp(name,args)) =
-      let fun arglist r [] = rev r
-            | arglist r (h::t) =
-                arglist ((subs l h)::r) t
-      in
-        Tyapp(name, arglist [] args)
-      end
-#+END_SRC
-
-#+BEGIN_SRC sml
 fun compose [] s1 = s1
   | compose (s::ss) s1 =
       let fun iter r s [] = rev r
@@ -166,11 +154,18 @@ fun compose [] s1 = s1
 #+BEGIN_SRC clojure
 
 (defn compose
-  "Composition of lists of substitutions"
+  "Composition of lists of substitutions.
+   The substitution `S` is the composition `S = [f(b,x)/y] ◦ [a/x]` of the two
+   separate substitutions `[a/x]` and `[f(b,x)/y]`. Note that composition of
+   substitutions is right to left so that we perform the rightmost first, and we
+   apply the rightmost to the leftmost in the process of composing. The order
+   matters. It is easy to see that the substitution `S` applied to `f(a,y)`
+   gives `f(a,f(b,a))` and when applied to `f(x,f(b,x))` yields the same. Thus
+   we say `S` is a unifier of `f(a,y)` and `f(x,f(b,x))`."
   [s s1]
   (if (empty? s)
     s1
-    (let [iter (fn [r s ss]
+    (let [iter (fn iter [r s ss]
                  (if (seq ss)
                    (let [[[t1 v1] & ss'] ss]
                      (iter (conj r [(substitute [s] t1) v1])
@@ -178,10 +173,7 @@ fun compose [] s1 = s1
                            ss'))
                    r))
           [s & ss] s]
-      (prn s ss)
       (compose ss (cons s (iter [] s s1))))))
-
-(compose '[a] '[a])
 
 (defn unify-ex [s]
   (throw (ex-info s {:type :unify})))
@@ -190,16 +182,78 @@ fun compose [] s1 = s1
 
 #+BEGIN_SRC clojure
 
-(defn unify-args [r t1s t2s])
+(declare unify*)
 
-#+END_SRC
+(defn unify-args [acc args1 args2]
+  (cond (and (empty? args1) (empty? args2))
+        acc
+        (= (count args1) (count args2))
+        (let [[t1 & t1s] args1
+              [t2 & t2s] args2]
+          (recur (compose (unify* []
+                                  (substitute acc t1)
+                                  (substitute acc t2))
+                          acc)
+                 t1s
+                 t2s))
+        :else (unify-ex "Arity")))
 
-#+BEGIN_SRC sml
-fun unify_args r [] [] = rev r
-  | unify_args r [] _ = raise Unify "Arity"
-  | unify_args r _ [] = raise Unify "Arity"
-  | unify_args r (t1::t1s) (t2::t2s) =
-      unify_args (compose (iter [] (subs r t1) (subs r t2)) r) t1s t2s
+(defn unify* [acc [t v :as t1] [t' v' :as t2]]
+  (case [t t']
+    [::var ::var] (if (= v v') [] (cons [t1 v'] acc))
+    [::var ::app] (if (empty? (:args v'))
+                    (cons [t2 v] acc)
+                    (if (occurs? v t2)
+                      (unify-ex "Occurs")
+                      (cons [t2 v] acc)))
+    [::app ::var] (if (empty? (:args v))
+                    (cons [t1 v'] acc)
+                    (if (occurs? v' t1)
+                      (unify-ex "Occurs")
+                      (cons [t1 v'] acc)))
+    [::app ::app] (let [{name1 :op args1 :args} v
+                        {name2 :op args2 :args} v']
+                    (if (= name1 name2)
+                      (unify-args acc args1 args2)
+                      (unify-ex "Const")))))
+
+(defn unify
+  "To find the most general unifier `U = MGU(t,t')` of terms `t` and `t`:
+      (i) If `t = x` and `t' = y` then `U = [x/y]`
+    (iia) If `t = x` and `t' = f(s[1],s[2],...,s[n])` and `x` does not occur in
+          `t'` then `U = [t'/x]`
+    (iib) If `t = f(s[1],s[2],...,s[n])` and `t' = x` and `x` does not occur in
+          `t` then `U = [t/x]`
+    (iii) If `t = a` and `t' = a` then `U = []`
+     (iv) If `t = f(s[1],s[2],...,s[n])` and `t' = f(s[1],s[2],...,s[n])` then
+          `U = MGU( f(U[1]s[2],U[1]s[3],...,s[n])
+                  , f(U[1]s[2]',U[1]s[3]',...,s[n])) ◦ U[1]`
+           where `U[1] = MGU(s[1]',s[1]')
+  In any other circumstances the algorithm fails"
+  [t1 t2]
+  (unify* () t1 t2))
+
+(comment
+
+  (= (unify (s/conform ::exp 'x) (s/conform ::exp 'y))
+     '([[:algorithm-w/var x] y]))
+
+  (= (unify (s/conform ::exp 'x) (s/conform ::exp '(f s' s'')))
+     '([[:algorithm-w/app
+         {:op [:algorithm-w/var f],
+          :args [[:algorithm-w/var s'] [:algorithm-w/var s'']]}]
+        x]))
+
+  (= (unify (s/conform ::exp '(f s' s'')) (s/conform ::exp 'x))
+     '([[:algorithm-w/app
+         {:op [:algorithm-w/var f],
+          :args [[:algorithm-w/var s'] [:algorithm-w/var s'']]}] x]))
+
+  (= (unify (s/conform ::exp 'a) (s/conform ::exp 'a)) [])
+
+  )
+
+
 #+END_SRC
 
 The Hindley-Milner Type Inference Algorithm
