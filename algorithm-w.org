@@ -20,11 +20,9 @@ id | application | lambda | let
 
 ** Untyped λ-calculus syntax
 
-#+BEGIN_SRC clojure
-
-(ns algorithm-w)
-
-(require '[clojure.spec.alpha :as s])
+#+begin_src clojure :tangle yes
+(ns algorithm-w
+  (:require [clojure.spec.alpha :as s]))
 
 (s/def ::exp
   (s/or ::var ::var
@@ -44,8 +42,7 @@ id | application | lambda | let
   (s/cat :let #{'let}
          :bin (s/and vector? (s/cat :var ::var :exp ::exp))
          :exp ::exp))
-
-#+END_SRC
+#+end_src
 
 Assuming a set of /type-variables α/ and primitive types /ι/, the syntax of
 types /τ/ and of /type-schemes σ/ is given by:
@@ -64,8 +61,8 @@ we can unify /f(a, y)/ with /f(x, f (b, x))/ with the substitution
 /[a/x, f (b, a)/y]/ which should be read ‘substitute /a/ for /x/ and then
 substitute /f(b, a)/ for /y/’.
 
-The substitution /S/ is the composition /S = [ f (b, x)/y] ◦ [a/x]/ of the two
-separate substitutions /[a/x]/ and /[f (b, x)/y]/. Note that composition of
+The substitution /S/ is the composition /S = [f(b,x)/y] ◦ [a/x]/ of the two
+separate substitutions /[a/x]/ and /[f(b,x)/y]/. Note that composition of
 substitutions is right to left so that we perform the rightmost first, and we
 apply the rightmost to the leftmost in the process of composing. The order
 matters. It is easy to see that the substitution /S/ applied to /f(a, y)/ gives
@@ -75,94 +72,52 @@ say /S/ is a unifier of /f(a, y)/ and /f(x, f(b, x))/.
 ** Occurs check
 
 
-#+BEGIN_SRC clojure
+#+begin_src clojure :tangle yes
 (defn occurs?
   "A variable `x` occurs in `term` if and only if `t = f(s[1],...s[n])` for
   `n > 0` and either `s[i] = x` or `x` occurs in `s[i]` for some
   `i = 1,2,...,n`"
-  [x [t form :as term]]
+  [x [t form]]
   (case t
-    ::app (or (occurs? x (:op form))
-              (when (contains? form :args)
-                (let [[[t' x' :as h] & more] (:args form)]
-                  (or (and (= t' ::var) (= x x'))
-                      (occurs? x h)
-                      (and (seq more)
-                           (occurs? x [::app (assoc form :args more)]))))))
-    ::var (= x form)
+    ::app
+    (or (occurs? x (:op form))
+        (when (contains? form :args)
+          (let [[[t' x' :as h] & more] (:args form)]
+            (or (and (= t' ::var) (= x x'))
+                (occurs? x h)
+                (and (seq more)
+                     (occurs? x [::app (assoc form :args more)]))))))
+    ::var
+    (= x form)
     nil))
+#+end_src
 
-(comment
-
-  (occurs? 'a (s/conform ::exp 'a))
-
-  (occurs? 'a (s/conform ::exp '(f a)))
-
-  (occurs? 'a (s/conform ::exp '((f a) b)))
-
-  (occurs? 'a (s/conform ::exp '((f b) a)))
-
-  (occurs? 'a (s/conform ::exp '((f b) b c d a)))
-
-  (occurs? 'a (s/conform ::exp '((f b) (g b) (h c (i a)))))
-
-  (occurs? 'a (s/conform ::exp '((f b) (g b) (h c (i d)))))
-
-  )
-
-#+END_SRC
-
-#+BEGIN_SRC clojure
-(defn substitute [l term]
-  (if (empty? l)
+#+begin_src clojure
+(defn substitute [coll term]
+  (if (empty? coll)
     term
     (let [[t s] term]
       (case t
-        ::var (let [[[t1 v1] & ss] l]
-                (if (= s v1) t1 (substitute ss term)))
-        ::app (if-let [args (:args s)]
-                [::app (assoc s :args (map (partial substitute l) args))]
-                term)))))
+        ::var
+        (let [[[t1 v1] & ss] coll]
+          (if (= s v1) t1 (substitute ss term)))
+        ::app
+        (if-let [args (:args s)]
+          [::app (assoc s :args (map (partial substitute coll) args))]
+          term)))))
+#+end_src
 
-(comment
-
-  (substitute '{int? a} (s/conform ::exp 'a))
-
-  (substitute '{int? a} (s/conform ::exp '(f a)))
-
-  (substitute '{int? a} (s/conform ::exp '(f b)))
-
-  (substitute '{int? a} (s/conform ::exp '((f b) (g b) (h c (i a)))))
-
-  (substitute '{int? a} (s/conform ::exp '((f b) (g b) (h c (i d)))))
-
-  )
-
-#+END_SRC
-
-#+BEGIN_SRC sml
-fun compose [] s1 = s1
-  | compose (s::ss) s1 =
-      let fun iter r s [] = rev r
-            | iter r s ((t1,v1)::ss) =
-                iter (((subs [s] t1),v1)::r) s ss
-      in
-        compose ss (s::(iter [] s s1))
-      end
-#+END_SRC
-
-#+BEGIN_SRC clojure
-
-(defn compose
-  "Composition of lists of substitutions.
-   The substitution `S` is the composition `S = [f(b,x)/y] ◦ [a/x]` of the two
-   separate substitutions `[a/x]` and `[f(b,x)/y]`. Note that composition of
+** Substitution composition
+   The substitution /S/ is the composition /S = [f(b,x)/y] ◦ [a/x]/ of the two
+   separate substitutions /[a/x]/ and /[f(b,x)/y]/. Note that composition of
    substitutions is right to left so that we perform the rightmost first, and we
    apply the rightmost to the leftmost in the process of composing. The order
-   matters. It is easy to see that the substitution `S` applied to `f(a,y)`
-   gives `f(a,f(b,a))` and when applied to `f(x,f(b,x))` yields the same. Thus
-   we say `S` is a unifier of `f(a,y)` and `f(x,f(b,x))`."
-  [s s1]
+   matters. It is easy to see that the substitution /S/ applied to /f(a,y)/
+   gives /f(a,f(b,a))/ and when applied to /f(x,f(b,x))/ yields the same. Thus
+   we say /S/ is a unifier of /f(a,y)/ and /f(x,f(b,x))/.
+
+#+begin_src clojure
+(defn compose [s s1]
   (if (empty? s)
     s1
     (let [iter (fn iter [r s ss]
@@ -175,12 +130,28 @@ fun compose [] s1 = s1
           [s & ss] s]
       (compose ss (cons s (iter [] s s1))))))
 
+#+end_src
+
+** Unification
+
+   To find the most general unifier `U = MGU(t,t')` of terms `t` and `t`:
+
+      (i) If `t = x` and `t' = y` then `U = [x/y]`
+    (iia) If `t = x` and `t' = f(s[1],s[2],...,s[n])` and `x` does not occur in
+          `t'` then `U = [t'/x]`
+    (iib) If `t = f(s[1],s[2],...,s[n])` and `t' = x` and `x` does not occur in
+          `t` then `U = [t/x]`
+    (iii) If `t = a` and `t' = a` then `U = []`
+     (iv) If `t = f(s[1],s[2],...,s[n])` and `t' = f(s[1],s[2],...,s[n])` then
+          `U = MGU( f(U[1]s[2],U[1]s[3],...,s[n])
+                  , f(U[1]s[2]',U[1]s[3]',...,s[n])) ◦ U[1]`
+           where `U[1] = MGU(s[1]',s[1]')
+
+   In any other circumstances the algorithm fails
+
+#+begin_src clojure
 (defn unify-ex [s]
   (throw (ex-info s {:type :unify})))
-
-#+END_SRC
-
-#+BEGIN_SRC clojure
 
 (declare unify*)
 
@@ -190,32 +161,43 @@ fun compose [] s1 = s1
         (= (count args1) (count args2))
         (let [[t1 & t1s] args1
               [t2 & t2s] args2]
-          (recur (compose (unify* []
-                                  (substitute acc t1)
-                                  (substitute acc t2))
+          (recur (compose (trampoline unify* []
+                                      (substitute acc t1)
+                                      (substitute acc t2))
                           acc)
                  t1s
                  t2s))
         :else (unify-ex "Arity")))
 
-(defn unify* [acc [t v :as t1] [t' v' :as t2]]
-  (case [t t']
-    [::var ::var] (if (= v v') [] (cons [t1 v'] acc))
-    [::var ::app] (if (empty? (:args v'))
-                    (cons [t2 v] acc)
-                    (if (occurs? v t2)
-                      (unify-ex "Occurs")
-                      (cons [t2 v] acc)))
-    [::app ::var] (if (empty? (:args v))
-                    (cons [t1 v'] acc)
-                    (if (occurs? v' t1)
-                      (unify-ex "Occurs")
-                      (cons [t1 v'] acc)))
-    [::app ::app] (let [{name1 :op args1 :args} v
-                        {name2 :op args2 :args} v']
-                    (if (= name1 name2)
-                      (unify-args acc args1 args2)
-                      (unify-ex "Const")))))
+(defmulti unify* (fn [_ [t] [t']] [t t']))
+
+(defmethod unify* [::var ::var]
+  [acc [_ v :as t1] [_ v' :as t2]]
+  (if (= v v')
+    []
+    (cons [t1 v'] acc)) )
+
+(defmethod unify* [::var ::app]
+  [acc [_ v :as t1] [_ v' :as t2]]
+  (if (empty? (:args v'))
+    (cons [t2 v] acc)
+    (if (occurs? v t2)
+      (unify-ex "Occurs")
+      (cons [t2 v] acc))))
+
+(defmethod unify* [::app ::var]
+  [acc [_ v :as t1] [_ v' :as t2]]
+  (if (empty? (:args v))
+    (cons [t1 v'] acc)
+    (if (occurs? v' t1)
+      (unify-ex "Occurs")
+      (cons [t1 v'] acc))))
+
+(defmethod unify* [::app ::app]
+  [acc [_ {name1 :op args1 :args}] [_ {name2 :op args2 :args}]]
+  (if (= name1 name2)
+    (trampoline unify-args acc args1 args2)
+    (unify-ex "Const")))
 
 (defn unify
   "To find the most general unifier `U = MGU(t,t')` of terms `t` and `t`:
@@ -232,29 +214,10 @@ fun compose [] s1 = s1
   In any other circumstances the algorithm fails"
   [t1 t2]
   (unify* () t1 t2))
+#+end_src
 
-(comment
-
-  (= (unify (s/conform ::exp 'x) (s/conform ::exp 'y))
-     '([[:algorithm-w/var x] y]))
-
-  (= (unify (s/conform ::exp 'x) (s/conform ::exp '(f s' s'')))
-     '([[:algorithm-w/app
-         {:op [:algorithm-w/var f],
-          :args [[:algorithm-w/var s'] [:algorithm-w/var s'']]}]
-        x]))
-
-  (= (unify (s/conform ::exp '(f s' s'')) (s/conform ::exp 'x))
-     '([[:algorithm-w/app
-         {:op [:algorithm-w/var f],
-          :args [[:algorithm-w/var s'] [:algorithm-w/var s'']]}] x]))
-
-  (= (unify (s/conform ::exp 'a) (s/conform ::exp 'a)) [])
-
-  )
-
-
-#+END_SRC
+** Algorithm W
+W(Γ,e)=(S,τ) where
 
 The Hindley-Milner Type Inference Algorithm
 Ian Grant∗
