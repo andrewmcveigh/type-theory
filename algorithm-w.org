@@ -1,3 +1,12 @@
+* Symbols / Notation
+  ⊢ https://en.wikipedia.org/wiki/Turnstile_(symbol)
+  In the typed lambda calculus, the turnstile is used to separate typing
+  assumptions from the typing judgement
+
+  For assumptions /A/, expressions /e/ and type-scheme /σ/ we write
+  /A/⊢/e/:/σ/
+
+  Inference rule: https://en.wikipedia.org/wiki/Rule_of_inference
 * λ-calculus
 
 type constants
@@ -52,6 +61,48 @@ types /τ/ and of /type-schemes σ/ is given by:
 
 A type-scheme ∀α₁...αₙτ has /generic/ type variables α₁...αₙ. A /monotype μ/ is
 a type containing no type variables.
+* Unification
+  Robinson 65
+
+** Substitution, Unification, and Resolution
+   The following definitions are concerned with the operation of instantiation,
+   i.e. substitution of terms for variables in well-formed expressions and in
+   sets of well-formed expressions, and with the various auxiliary notions
+   needed to define resolution in general.
+
+*** Substitution components.
+    A substitution component is any expression of the form /T/V/, where /V/ is
+    any variable and /T/ is any term different from /V/. /V/ is called the
+    /variable/ of the component /T/V/, and /T/ is called the /term/ of the
+    component /T/V/.
+
+*** Substitutions
+    A substitution is any finite set (possibly empty) of substitution components
+    none of the variables of which are the same. If /P/ is any set of terms, and
+    the terms of the components of the substitution /θ/ are all in /P/, we say
+    that /θ/ is a substitution over /P/. We write the substitution whose
+    components are /T₁/V₁,...,Tₖ/Vₖ/ as {/T₁/V₁,...,Tₖ/Vₖ/}, with the
+    understanding that the order of the components is immaterial. We use
+    lower-case Greek letters to denote substitutions. In particular, ε is the
+    /empty substitution/.
+
+*** Instantiation
+    If /E/ is any finite string of symbols and
+
+    /θ = {T₁/V₁...,Tₖ/Vₖ}/
+
+    is any substitution, then the instantiation of /E/ by /θ/ is the operation
+    of replacing each occurrence of the variable /Vᵢ, 1 <= /i/ <= /k/, in /E/ by
+    and occurrence of the term /Tᵢ/. The resulting string, denoted by /Eθ/ is
+    called the instance of /E/ by /θ/. I.e., if /E/ is the string
+    /E₀Vᵢ,E₁...VᵢₙEₙ/, then /Eθ/ is the string /E₀Tᵢ₁E₁..TᵢₙEₙ/. Here, none of the
+    substrings /Eᵢ/ of /E/ contain occurrences of the variables /V₁...,Vₖ/, some
+    of the /Eᵢ/ are possibly null, /n/ is possibly 0, and each /Vᵢⱼ/ is an
+    occurrence of one of the variables /V₁,...,Vₖ/. Any string /Eθ/ is called an
+    instance of the string /E/. If /C/ is any set of strings and /θ/ a
+    substitution, then the instance of /C/ by /θ/ is the set of all strings
+    /Eθ/, where /E/ is in /C/. We denote this set by /Cθ/, and say that it is an
+    instance of /C/.
 
 * Algorithm W
 
@@ -117,18 +168,18 @@ say /S/ is a unifier of /f(a, y)/ and /f(x, f(b, x))/.
    we say /S/ is a unifier of /f(a,y)/ and /f(x,f(b,x))/.
 
 #+begin_src clojure
-(defn compose [s s1]
-  (if (empty? s)
+(defn compose [coll s1]
+  (if (empty? coll)
     s1
-    (let [iter (fn iter [r s ss]
+    (let [iter (fn iter [acc s ss]
                  (if (seq ss)
                    (let [[[t1 v1] & ss'] ss]
-                     (iter (conj r [(substitute [s] t1) v1])
+                     (iter (conj acc [(substitute [s] t1) v1])
                            s
                            ss'))
-                   r))
-          [s & ss] s]
-      (compose ss (cons s (iter [] s s1))))))
+                   acc))
+          [head & tail] coll]
+      (compose tail (cons head (iter [] head s1))))))
 
 #+end_src
 
@@ -174,8 +225,8 @@ say /S/ is a unifier of /f(a, y)/ and /f(x, f(b, x))/.
 (defmethod unify* [::var ::var]
   [acc [_ v :as t1] [_ v' :as t2]]
   (if (= v v')
-    []
-    (cons [t1 v'] acc)) )
+    {}
+    (assoc acc t1 v')))
 
 (defmethod unify* [::var ::app]
   [acc [_ v :as t1] [_ v' :as t2]]
@@ -223,3 +274,5 @@ The Hindley-Milner Type Inference Algorithm
 Ian Grant∗
 January 17, 2011
 http://steshaw.org/hm/hindley-milner.pdf
+
+* Unification

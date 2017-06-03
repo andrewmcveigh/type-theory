@@ -23,6 +23,16 @@
 
 (substitute '{int? a} (s/conform ::w/exp '(f a)))
 
+(compose [[(s/conform ::w/exp 'y) (s/conform ::w/exp '(f b x))]
+          [(s/conform ::w/exp 'x) (s/conform ::w/exp 'a)]]
+         [[(s/conform ::w/exp '(f a y))]])
+
+
+(parse-ast '[:algorithm-w/var f])
+
+[:algorithm-w/app
+ {:op [:algorithm-w/var f], :args [[:algorithm-w/var b]]}]
+
 (substitute '{int? a} (s/conform ::w/exp '(f b)))
 
 (substitute '{int? a} (s/conform ::w/exp '((f b) (g b) (h c (i a)))))
@@ -45,4 +55,19 @@
 
 (= (unify (s/conform ::w/exp 'a) (s/conform ::w/exp 'a)) [])
 
-(unify (s/conform ::w/exp '(f s' s'' s''')) (s/conform ::w/exp '(f s' s'' x)))
+(unify (s/conform ::w/exp '(f s' s'' s'''))
+       (s/conform ::w/exp '(f s' s'' x)))
+
+(unify (s/conform ::w/exp '(f a y))
+       (s/conform ::w/exp '(f x (f b x))))
+
+
+
+(substitute [(s/conform ::w/exp '(f b x)) 'y]
+            (s/conform ::w/exp '(f a y)))
+
+
+([[:algorithm-w/app {:op [:algorithm-w/var f],
+                     :args ([:algorithm-w/var b] [:algorithm-w/var a])}]
+  y]
+ [[:algorithm-w/var a] x])
