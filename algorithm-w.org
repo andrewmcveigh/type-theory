@@ -104,6 +104,17 @@ a type containing no type variables.
     /Eθ/, where /E/ is in /C/. We denote this set by /Cθ/, and say that it is an
     instance of /C/.
 
+*** Standardizations
+    If /C/ is any finite set of string, and /V₁,...,Vₖ/ are all the distinct
+    variables, in alphabetical order, which occur in strings in /C/, then the
+    /x/-standardization of /C/, denoted by /ξc/, is the substitution
+    /{x₁/V₁,...,xₖ/Vₖ} and the /y/-standardization of /C/, denoted by /ηc/, is
+    the substitution
+
+    /{y₁/V₁,...,yₖ/Vₖ}
+
+*** Composition of substitutions
+
 * Algorithm W
 
 Unification is a recursive algorithm for determining a substitution of terms for
