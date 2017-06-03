@@ -92,7 +92,7 @@ a type containing no type variables.
     /θ = {T₁/V₁...,Tₖ/Vₖ}/
 
     is any substitution, then the instantiation of /E/ by /θ/ is the operation
-    of replacing each occurrence of the variable /Vᵢ, 1 <= /i/ <= /k/, in /E/ by
+    of replacing each occurrence of the variable /Vᵢ, 1 ≤ i ≤ k/, in /E/ by
     and occurrence of the term /Tᵢ/. The resulting string, denoted by /Eθ/ is
     called the instance of /E/ by /θ/. I.e., if /E/ is the string
     /E₀Vᵢ,E₁...VᵢₙEₙ/, then /Eθ/ is the string /E₀Tᵢ₁E₁..TᵢₙEₙ/. Here, none of the
