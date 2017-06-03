@@ -108,10 +108,10 @@ a type containing no type variables.
     If /C/ is any finite set of string, and /V₁,...,Vₖ/ are all the distinct
     variables, in alphabetical order, which occur in strings in /C/, then the
     /x/-standardization of /C/, denoted by /ξc/, is the substitution
-    /{x₁/V₁,...,xₖ/Vₖ} and the /y/-standardization of /C/, denoted by /ηc/, is
+    /{x₁/V₁,...,xₖ/Vₖ}/ and the /y/-standardization of /C/, denoted by /ηc/, is
     the substitution
 
-    /{y₁/V₁,...,yₖ/Vₖ}
+    /{y₁/V₁,...,yₖ/Vₖ}/
 
 *** Composition of substitutions
 
