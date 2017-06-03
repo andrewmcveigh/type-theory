@@ -114,6 +114,28 @@ a type containing no type variables.
     /{y₁/V₁,...,yₖ/Vₖ}/
 
 *** Composition of substitutions
+    If /θ = {T₁/V₁,...,Tₖ/Vₖ}/ and λ are any two substitutions, then the set
+    /θ′∪λ′/, where /λ′/ is the set of all components of λ whose variables are not
+    among /V₁,...,Vₖ/ and /θ′/ is the set of all components /Tᵢλ/Vᵢ/, /1 ≤ i ≤ k/,
+    such that /Tᵢλ/ is different from /Vᵢ/, is called the composition of /θ/ and
+    /λ/, and is denoted by /θλ/.
+
+    It is straightforward to verify that /εθ = θε = θ/ for any substitution /θ/.
+    Also, composition of substitutions enjoys the associative property
+    /(θλ)μ = θ(λμ)/, so that we may omit parentheses is writing multiple
+    compositions of substitutions.
+
+    The point of the composition operation on substitutions is that, when /E/ is
+    any string, and /σ = θλ/, the string /Eσ/ is just the string /Eθλ/, i.e. the
+    instance of /Eθ/ by /λ/.
+
+    These properties of the composition of substitutions are established by the
+    following propositions.
+
+**** /(Eσ)λ = E(σλ) for all strings E and all substitutions σ, λ/.
+     PROOF. Let /σ = {T₁/V₁,...,Tₖ/Vₖ}, λ = {U₁/W₁,...Uₘ/Wₘ}/ and
+     /E = E₀Vᵢ₁E₁...VᵢₙEₙ/ as explained in (5.3) above. Then by definition
+     /Eσ = E₀Tᵢ₁E₁...TᵢₙEₙ/, and (Eσ)λ = ‾E
 
 * Algorithm W
 
