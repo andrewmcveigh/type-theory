@@ -4,7 +4,8 @@
 (def test-dependencies
   '[[org.clojure/test.check "0.9.0"]])
 
-(set-env! :dependencies (vec (concat dependencies test-dependencies)))
+(set-env! :dependencies (vec (concat dependencies test-dependencies))
+          :source-paths #{"src"})
 
 (defn cider? []
   (get (ns-publics 'boot.user) 'cider))
