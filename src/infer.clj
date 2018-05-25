@@ -1,10 +1,13 @@
-(ns algorithm-w
+(ns infer
   (:refer-clojure :exclude [extend])
   (:require
    [clojure.spec.alpha :as s]
    [clojure.string :as string]
    [clojure.set :as set]
-   [type :refer :all]))
+   [syntax]
+   [type :refer :all])
+  (:import
+   [syntax Var Abs App]))
 
 ;;; Context / Type Schemes
 
@@ -96,6 +99,8 @@
                    [(substitute term substitution) var])))
          (Sub. orig))))
 
+(print-show Env Sub)
+
 (def idsub (Sub. [[]] [[]]))
 
 (defn sub [pairs]
@@ -114,14 +119,13 @@
     (reduce -compose (reverse substitutions))))
 
 (defn instantiate [state scheme]
-  (let [[vars' state'] (map-m fresh state (:vars scheme))
+  (let [vars           (:vars scheme)
+        [vars' state'] (map-m (fn [s _] (fresh s)) state vars)
         subst          (sub (interleave vars vars'))]
     [(substitute (:t scheme) subst) state']))
 
 (defn generalize [env t]
   (Scheme. (set/difference (free t) (free env)) t))
-
-(print-show Sub TVar TConst TArrow)
 
 
 ;;; Unification
@@ -139,19 +143,19 @@
   (throw
    (Exception. (format "Infinite Type %s %s" (pr-str a) (pr-str t)))))
 
-(defmethod unify* [Var Var]
+(defmethod unify* [type.Var type.Var]
   [acc t1 t2]
   (if (= t1 t2)
     idsub
     (singleton t2 t1)))
 
-(defmethod unify* [Var App]
+(defmethod unify* [type.Var type.Arrow]
   [acc t1 t2]
   (if (occurs? t1 t2)
     (ex-infitite-type t1 t2)
     (singleton t1 t2)))
 
-(defmethod unify* [App Var]
+(defmethod unify* [type.Arrow type.Var]
   [acc t1 t2]
   (if (occurs? t2 t1)
     (ex-infitite-type t2 t1)
@@ -165,8 +169,9 @@
           s2 (trampoline unify* idsub t1 t2)]
       (recur (compose s2 s1) t1s t2s))))
 
-(defmethod unify* [App App]
+(defmethod unify* [type.Arrow type.Arrow]
   [acc t1 t2]
+  ;; ^ think the acc can go
   (let [[op1 & args1] (.-value t1)
         [op2 & args2] (.-value t2)
         s1            (unify* acc op1 op2)]
@@ -182,22 +187,35 @@
 
 ;;; Inference
 
-(defn infer [state env expr]
-  (case (type expr)
-    Var (if-let [s (get env expr)]
-          (let [[t state'] (instantiate state s)]
-            [[idsub t] state])
-          (throw (Exception. (format "UnboundVariable %s" expr))))
+(defn infer* [state env expr]
+  (condp = (type expr)
+    Var
+    (if-let [s (get env expr)]
+      (do
+        (prn s)
+        (let [[t state'] (instantiate state s)]
+         [[idsub t] state]))
+      (throw (Exception. (format "UnboundVariable %s" (pr-str expr)))))
 
-    Abs (let [[x e] (:value expr)
-              [tv state'] (fresh state)
-              env' (extend env x (Scheme. [] tv))
-              [[s1 t1] state''] (infer state' env' e)]
-          [[s1 (substitute (App. [tv t1]) s1)] state''])
+    Abs
+    (let [[x e] (:value expr)
+          [tv state'] (fresh state)
+          env' (assoc env x (Scheme. [] tv))
+          [[s1 t1] state''] (infer* state' env' e)]
+      [[s1 (substitute (type.Arrow. tv t1) s1)] state''])
 
-    App (let [[e1 e2] expr
-              [tv state']        (fresh state)
-              [[s1 t1] state'']  (infer env e1)
-              [[s2 t2] state'''] (infer (substitute env s1) e2)
-              s3                 (unify (substitute t1 s2) )])
-    ))
+    App
+    (let [[e1 e2] (:value expr)
+          [tv state']        (fresh state)
+          [[s1 t1] state'']  (infer* env e1)
+          [[s2 t2] state'''] (infer* (substitute env s1) e2)
+          s3                 (unify (substitute t1 s2) )]
+      [[(compose s3 s2 s1) (substitute tv s3)] state'''])))
+
+(defn infer [expr]
+  (first (infer* nil nil expr)))
+
+;; (infer* {:next 0}
+;;         (Env. {(Var. 'a)
+;;                (Scheme. #{'a} ())})
+;;         (Var. 'a))

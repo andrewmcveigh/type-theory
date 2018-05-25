@@ -28,8 +28,7 @@
 ;;; Parsing
 
 (s/def ::exp
-  (s/or ::sub ::sub
-        ::var ::var
+  (s/or ::var ::var
         ::app ::app
         ::abs ::abs
         ::let ::let))
@@ -47,32 +46,33 @@
          :bin (s/and vector? (s/cat :var ::var :exp ::exp))
          :exp ::exp))
 
-(s/def ::subc
-  (s/or :id  (s/and vector? empty?)
-        :sub (s/and vector? (s/cat :term ::exp :/ #{'/} :var ::exp))))
+;; (s/def ::subc
+;;   (s/or :id  (s/and vector? empty?)
+;;         :sub (s/and vector? (s/cat :term ::exp :/ #{'/} :var ::exp))))
 
-(s/def ::sub
-  (s/or :subs (s/cat :subs (s/* (s/cat :subc ::subc :comp #{'◦})) :sub ::subc)
-        :subc ::subc))
+;; (s/def ::sub
+;;   (s/or :subs (s/cat :subs (s/* (s/cat :subc ::subc :comp #{'◦})) :sub ::subc)
+;;         :subc ::subc))
+
+;; ::sub (let [[t' x'] x
+;;             ->sub (fn [[t x]]
+;;                     (case t
+;;                       :id  idsub
+;;                       :sub (Sub. [[(parse-ast (:term x))
+;;                                    (parse-ast (:var x))]]
+;;                                  [[(parse-ast (:term x))
+;;                                    (parse-ast (:var x))]])))]
+;;         (case t'
+;;           :subs (apply compose
+;;                        (conj (mapv (comp ->sub :subc) (:subs x'))
+;;                              (->sub (:sub x'))))
+;;           :subc (->sub x')))
 
 (defn parse-ast [[t x]]
   (case t
     ::var (Var. x)
     ::app (App. (vec (cons (parse-ast (:op x))
-                           (map parse-ast (:args x)))))
-    ::sub (let [[t' x'] x
-                ->sub (fn [[t x]]
-                        (case t
-                          :id  idsub
-                          :sub (Sub. [[(parse-ast (:term x))
-                                       (parse-ast (:var x))]]
-                                     [[(parse-ast (:term x))
-                                       (parse-ast (:var x))]])))]
-            (case t'
-              :subs (apply compose
-                           (conj (mapv (comp ->sub :subc) (:subs x'))
-                                 (->sub (:sub x'))))
-              :subc (->sub x')))))
+                           (map parse-ast (:args x)))))))
 
 (defn parse [x]
   (parse-ast (s/conform ::exp x)))
